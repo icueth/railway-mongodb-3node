@@ -1,0 +1,7 @@
+REPLICA_SET_NAME=rs0
+MONGO_PRIMARY_HOST=mongo-primary.railway.internal
+MONGO_SECONDARY_HOST=mongo-secondary.railway.internal
+MONGO_ARBITER_HOST=mongo-arbiter.railway.internal
+MONGO_PORT=27017
+MONGOUSERNAME=admin
+MONGOPASSWORD=<your-password>
