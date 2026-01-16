@@ -1,7 +1,12 @@
+# MongoDB Node Variables (Primary, Secondary, Arbiter)
 REPLICA_SET_NAME=rs0
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=<your-secure-password>
+
+# Init Service Variables (for initServicePSA)
 MONGO_PRIMARY_HOST=mongo-primary.railway.internal
 MONGO_SECONDARY_HOST=mongo-secondary.railway.internal
 MONGO_ARBITER_HOST=mongo-arbiter.railway.internal
 MONGO_PORT=27017
 MONGOUSERNAME=admin
-MONGOPASSWORD=<your-password>
+MONGOPASSWORD=<your-secure-password>

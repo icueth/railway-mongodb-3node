@@ -21,7 +21,7 @@
 ## ✨ Features
 
 - 🚀 **One-Click Deployment** - Deploy a fully configured replica set with minimal setup
-- 🔐 **Secure by Default** - Keyfile authentication enabled out of the box
+- 🔐 **Auto-Generated Keyfile** - Secure keyfile automatically generated from credentials
 - 🏗️ **PSA Architecture** - Primary, Secondary, Arbiter configuration for high availability
 - 📦 **MongoDB 8** - Latest stable version with all modern features
 - 🔄 **Auto Failover** - Automatic failover when primary goes down
@@ -31,15 +31,7 @@
 
 ## 🏁 Quick Start
 
-### 1. Generate a Keyfile
-
-```bash
-openssl rand -base64 756
-```
-
-> ⚠️ **Important**: Save this keyfile securely - all nodes must use the same keyfile.
-
-### 2. Deploy on Railway
+### 1. Deploy on Railway
 
 Deploy each node from their respective directories:
 
@@ -48,6 +40,18 @@ Deploy each node from their respective directories:
 | **Primary**   | `nodes/primary/`   | ✅ `/data`      |
 | **Secondary** | `nodes/secondary/` | ✅ `/data`      |
 | **Arbiter**   | `nodes/arbiter/`   | ❌ None         |
+
+### 2. Set Environment Variables
+
+Set these variables for all MongoDB nodes:
+
+```bash
+REPLICA_SET_NAME=rs0
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=<your-secure-password>
+```
+
+> 💡 **Note**: Keyfile is **automatically generated** from your credentials - no manual setup required!
 
 ### 3. Initialize Replica Set
 
@@ -121,12 +125,13 @@ railsway-mongodb-3node/
 
 #### MongoDB Nodes
 
-| Variable                     | Description                                 | Required |
-| ---------------------------- | ------------------------------------------- | -------- |
-| `KEYFILE`                    | Base64-encoded keyfile for replica set auth | ✅       |
-| `REPLICA_SET_NAME`           | Replica set identifier (e.g., `rs0`)        | ✅       |
-| `MONGO_INITDB_ROOT_USERNAME` | Admin username                              | ✅       |
-| `MONGO_INITDB_ROOT_PASSWORD` | Admin password                              | ✅       |
+| Variable                     | Description                                       | Required |
+| ---------------------------- | ------------------------------------------------- | -------- |
+| `REPLICA_SET_NAME`           | Replica set identifier (e.g., `rs0`)              | ✅       |
+| `MONGO_INITDB_ROOT_USERNAME` | Admin username                                    | ✅       |
+| `MONGO_INITDB_ROOT_PASSWORD` | Admin password (also used for keyfile generation) | ✅       |
+
+> 🔐 **Auto-Generated Keyfile**: The keyfile is automatically generated using your `MONGO_INITDB_ROOT_PASSWORD` and `REPLICA_SET_NAME`. All nodes with the same credentials will have identical keyfiles.
 
 #### Init Service
 
@@ -171,11 +176,12 @@ mongo-init         → Build from: initServicePSA/
 Create shared variables for all MongoDB nodes:
 
 ```bash
-KEYFILE=<your-base64-keyfile>
 REPLICA_SET_NAME=rs0
 MONGO_INITDB_ROOT_USERNAME=admin
 MONGO_INITDB_ROOT_PASSWORD=<strong-password>
 ```
+
+> 🔐 Keyfile is **automatically generated** - no manual setup needed!
 
 For the init service:
 
