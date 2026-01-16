@@ -1,27 +1,23 @@
 # 🍃 MongoDB Replica Set on Railway
 
 <p align="center">
-  <img src="https://www.mongodb.com/assets/images/global/MongoDB_Logo_Dark_RGB.svg" alt="MongoDB Logo" width="400">
-</p>
-
-<p align="center">
-  <strong>Deploy a production-ready MongoDB Replica Set on Railway in minutes</strong>
+  <strong>Deploy a production-ready MongoDB PSA Replica Set on Railway in minutes</strong>
 </p>
 
 <p align="center">
   <a href="#-features">Features</a> •
   <a href="#-quick-start">Quick Start</a> •
-  <a href="#️-architecture">Architecture</a> •
+  <a href="#-architecture">Architecture</a> •
   <a href="#-configuration">Configuration</a> •
-  <a href="#-deployment">Deployment</a>
+  <a href="#-troubleshooting">Troubleshooting</a>
 </p>
 
 ---
 
 ## ✨ Features
 
-- 🚀 **One-Click Deployment** - Deploy a fully configured replica set with minimal setup
-- 🔐 **Auto-Generated Keyfile** - Secure keyfile automatically generated from credentials
+- 🚀 **Easy Deployment** - Deploy a fully configured replica set with clear steps
+- 🔐 **Secure Authentication** - Keyfile-based replica set authentication
 - 🏗️ **PSA Architecture** - Primary, Secondary, Arbiter configuration for high availability
 - 📦 **MongoDB 8** - Latest stable version with all modern features
 - 🔄 **Auto Failover** - Automatic failover when primary goes down
@@ -31,7 +27,17 @@
 
 ## 🏁 Quick Start
 
-### 1. Deploy on Railway
+### Step 1: Generate a Keyfile
+
+Generate a secure keyfile that will be shared across all nodes:
+
+```bash
+openssl rand -base64 756
+```
+
+> ⚠️ **Important**: Copy the entire output. All nodes MUST use the **same keyfile**.
+
+### Step 2: Deploy MongoDB Nodes
 
 Deploy each node from their respective directories:
 
@@ -41,21 +47,36 @@ Deploy each node from their respective directories:
 | **Secondary** | `nodes/secondary/` | ✅ `/data`      |
 | **Arbiter**   | `nodes/arbiter/`   | ❌ None         |
 
-### 2. Set Environment Variables
+### Step 3: Set Environment Variables for Nodes
 
-Set these variables for all MongoDB nodes:
+Set these variables for **all MongoDB nodes** (primary, secondary, arbiter):
 
 ```bash
+KEYFILE=<paste-your-generated-keyfile-here>
 REPLICA_SET_NAME=rs0
 MONGO_INITDB_ROOT_USERNAME=admin
 MONGO_INITDB_ROOT_PASSWORD=<your-secure-password>
 ```
 
-> 💡 **Note**: Keyfile is **automatically generated** from your credentials - no manual setup required!
+> 🔐 **Critical**: The `KEYFILE` must be **exactly the same** on all three nodes!
 
-### 3. Initialize Replica Set
+### Step 4: Initialize Replica Set
 
-Deploy the init service from `initServicePSA/` and wait for completion.
+1. Deploy the init service from `initServicePSA/`
+2. Set these environment variables:
+
+```bash
+REPLICA_SET_NAME=rs0
+MONGO_PRIMARY_HOST=mongo-primary.railway.internal
+MONGO_SECONDARY_HOST=mongo-secondary.railway.internal
+MONGO_ARBITER_HOST=mongo-arbiter.railway.internal
+MONGO_PORT=27017
+MONGOUSERNAME=admin
+MONGOPASSWORD=<your-secure-password>
+```
+
+3. Wait for the init service to complete
+4. **Delete the init service** after seeing "PLEASE DELETE THIS SERVICE"
 
 ---
 
@@ -99,22 +120,18 @@ Deploy the init service from `initServicePSA/` and wait for completion.
 ```
 railsway-mongodb-3node/
 ├── 📂 nodes/
-│   ├── 📂 primary/              # Primary node configuration
-│   │   ├── Dockerfile           # MongoDB 8 image setup
-│   │   └── generate-keyfile.sh  # Keyfile generator
-│   ├── 📂 secondary/            # Secondary node configuration
-│   │   ├── Dockerfile
-│   │   └── generate-keyfile.sh
-│   └── 📂 arbiter/              # Arbiter node configuration
-│       ├── Dockerfile
-│       └── generate-keyfile.sh
-├── 📂 initServicePSA/           # Replica set initializer
-│   ├── Dockerfile
-│   ├── initiate-replica-psa.sh  # PSA initialization script
-│   └── railway.json
-├── 📄 exampleENV                 # Environment template
-├── 📄 LICENSE                    # MIT License
-└── 📄 README.md                  # This file
+│   ├── 📄 Dockerfile              # Shared Dockerfile template
+│   ├── 📄 generate-keyfile.sh     # Keyfile setup script
+│   ├── 📂 primary/                # Primary node
+│   ├── 📂 secondary/              # Secondary node
+│   └── 📂 arbiter/                # Arbiter node
+├── 📂 initServicePSA/             # PSA replica set initializer
+│   ├── 📄 Dockerfile
+│   ├── 📄 initiate-replica-psa.sh
+│   └── 📄 railway.json
+├── 📄 exampleENV                  # Environment template
+├── 📄 LICENSE
+└── 📄 README.md
 ```
 
 ---
@@ -123,15 +140,14 @@ railsway-mongodb-3node/
 
 ### Environment Variables
 
-#### MongoDB Nodes
+#### MongoDB Nodes (Primary, Secondary, Arbiter)
 
-| Variable                     | Description                                       | Required |
-| ---------------------------- | ------------------------------------------------- | -------- |
-| `REPLICA_SET_NAME`           | Replica set identifier (e.g., `rs0`)              | ✅       |
-| `MONGO_INITDB_ROOT_USERNAME` | Admin username                                    | ✅       |
-| `MONGO_INITDB_ROOT_PASSWORD` | Admin password (also used for keyfile generation) | ✅       |
-
-> 🔐 **Auto-Generated Keyfile**: The keyfile is automatically generated using your `MONGO_INITDB_ROOT_PASSWORD` and `REPLICA_SET_NAME`. All nodes with the same credentials will have identical keyfiles.
+| Variable                     | Description                             | Required |
+| ---------------------------- | --------------------------------------- | -------- |
+| `KEYFILE`                    | Base64-encoded keyfile (from openssl)   | ✅       |
+| `REPLICA_SET_NAME`           | Replica set identifier (default: `rs0`) | ✅       |
+| `MONGO_INITDB_ROOT_USERNAME` | Admin username                          | ✅       |
+| `MONGO_INITDB_ROOT_PASSWORD` | Admin password                          | ✅       |
 
 #### Init Service
 
@@ -148,170 +164,92 @@ railsway-mongodb-3node/
 
 ---
 
-## � Deployment
-
-### Step-by-Step Guide
-
-#### 1️⃣ Create Services on Railway
-
-Create **4 services** in your Railway project:
-
-```
-mongo-primary      → Build from: nodes/primary/
-mongo-secondary    → Build from: nodes/secondary/
-mongo-arbiter      → Build from: nodes/arbiter/
-mongo-init         → Build from: initServicePSA/
-```
-
-#### 2️⃣ Configure Volumes
-
-| Service           | Volume Mount Point     |
-| ----------------- | ---------------------- |
-| `mongo-primary`   | `/data`                |
-| `mongo-secondary` | `/data`                |
-| `mongo-arbiter`   | None (no data storage) |
-
-#### 3️⃣ Set Environment Variables
-
-Create shared variables for all MongoDB nodes:
-
-```bash
-REPLICA_SET_NAME=rs0
-MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=<strong-password>
-```
-
-> 🔐 Keyfile is **automatically generated** - no manual setup needed!
-
-For the init service:
-
-```bash
-MONGO_PRIMARY_HOST=mongo-primary.railway.internal
-MONGO_SECONDARY_HOST=mongo-secondary.railway.internal
-MONGO_ARBITER_HOST=mongo-arbiter.railway.internal
-MONGOUSERNAME=admin
-MONGOPASSWORD=<strong-password>
-REPLICA_SET_NAME=rs0
-```
-
-#### 4️⃣ Deploy & Initialize
-
-1. Deploy all MongoDB node services first
-2. Wait for all nodes to be healthy
-3. Deploy the init service
-4. Check init service logs for success message
-5. **Delete the init service** after successful initialization
-
----
-
 ## 🔗 Connection String
 
-After successful initialization, use this connection string:
+After successful initialization:
 
 ```
-mongodb://<username>:<password>@mongo-primary.railway.internal:27017,mongo-secondary.railway.internal:27017/?replicaSet=rs0&authSource=admin
+mongodb://admin:<password>@mongo-primary.railway.internal:27017,mongo-secondary.railway.internal:27017/?replicaSet=rs0&authSource=admin
 ```
 
-> 💡 **Note**: The arbiter is not included in connection strings as it doesn't store data.
-
-### Connection Examples
-
-#### Node.js
-
-```javascript
-const { MongoClient } = require("mongodb");
-
-const uri =
-  "mongodb://admin:password@mongo-primary.railway.internal:27017,mongo-secondary.railway.internal:27017/?replicaSet=rs0&authSource=admin";
-const client = new MongoClient(uri);
-
-async function connect() {
-  await client.connect();
-  console.log("Connected to MongoDB Replica Set");
-}
-```
-
-#### Python
-
-```python
-from pymongo import MongoClient
-
-uri = "mongodb://admin:password@mongo-primary.railway.internal:27017,mongo-secondary.railway.internal:27017/?replicaSet=rs0&authSource=admin"
-client = MongoClient(uri)
-
-# Verify connection
-print(client.server_info())
-```
+> 💡 The arbiter is not included in connection strings as it doesn't store data.
 
 ---
 
 ## 🔒 Security Best Practices
 
 - ✅ Use **strong, unique passwords** for production
-- ✅ Keep the **keyfile secure** and consistent across all nodes
+- ✅ Keep the **keyfile secret** - anyone with it can join the replica set
+- ✅ Use the **same keyfile** on all nodes
 - ✅ Use **Railway's internal networking** for inter-node communication
-- ✅ Enable **TLS/SSL** for production deployments
-- ✅ Regularly **rotate credentials** and keyfiles
-- ✅ Implement **proper access controls** and user roles
+- ✅ Regularly **rotate credentials**
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Common Issues
+### "Cannot select sync source because it is not readable"
 
-<details>
-<summary><strong>Replica set initialization failed</strong></summary>
+**Cause**: Keyfile mismatch between nodes
 
-1. Ensure all nodes are running and healthy
-2. Verify all nodes use the **same keyfile**
-3. Check that hostnames are correctly set
-4. Enable `DEBUG=1` on init service for verbose logs
+**Solution**:
 
-</details>
+1. Verify `KEYFILE` is **exactly the same** on all nodes
+2. Delete volumes on all nodes
+3. Redeploy all nodes
+4. Redeploy init service
 
-<details>
-<summary><strong>Authentication failed</strong></summary>
+### "Read security file failed"
 
-1. Verify username/password are correct
-2. Ensure `authSource=admin` is in connection string
-3. Check that credentials match across all services
+**Cause**: Keyfile is missing or has wrong format
 
-</details>
+**Solution**:
 
-<details>
-<summary><strong>Connection timeout</strong></summary>
+1. Ensure `KEYFILE` environment variable is set
+2. Keyfile should be base64-encoded string
+3. Check for extra spaces or newlines in the value
 
-1. Verify services are deployed in the same Railway project
-2. Use internal hostnames (`.railway.internal`)
-3. Check that port 27017 is accessible
+### "No primary exists"
 
-</details>
+**Cause**: Replica set not initialized yet
+
+**Solution**:
+
+1. Wait for all nodes to be online first
+2. Check init service logs
+3. Redeploy init service
+
+### Common Warnings (Can Be Ignored)
+
+- `vm.max_map_count is too low` - Kernel parameter, cannot change on Railway
+- `swappiness` - Kernel parameter, cannot change on Railway
+- `Automatically disabling TLS 1.0 and TLS 1.1` - Expected behavior
 
 ---
 
-## 📝 Changelog
+## 📝 Deployment Checklist
 
-| Version  | Changes                                |
-| -------- | -------------------------------------- |
-| **v2.0** | Updated to MongoDB 8, PSA architecture |
-| **v1.0** | Initial release with MongoDB 7         |
+```
+□ 1. Generate keyfile: openssl rand -base64 756
+□ 2. Copy keyfile to a safe place
+□ 3. Deploy mongo-primary from nodes/primary/
+□ 4. Deploy mongo-secondary from nodes/secondary/
+□ 5. Deploy mongo-arbiter from nodes/arbiter/
+□ 6. Add volume /data to primary and secondary
+□ 7. Set environment variables on ALL nodes (same KEYFILE!)
+□ 8. Wait for all nodes to be Online
+□ 9. Deploy init service from initServicePSA/
+□ 10. Set environment variables on init service
+□ 11. Check init service logs for success
+□ 12. Delete init service after initialization
+□ 13. Test connection using connection string
+```
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to:
-
-- 🐛 Report bugs
-- 💡 Suggest features
-- 🔧 Submit pull requests
+MIT License - see [LICENSE](LICENSE)
 
 ---
 

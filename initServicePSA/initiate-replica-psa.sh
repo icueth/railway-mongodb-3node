@@ -1,57 +1,95 @@
 #!/bin/bash
-
 set -e
 
-debug_log() {
-  if [[ "$DEBUG" == "1" ]]; then
-    echo "DEBUG: $1"
-  fi
+# ============================================================
+# MongoDB PSA Replica Set Initializer
+# Primary + Secondary + Arbiter Configuration
+# ============================================================
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_debug() { [[ "$DEBUG" == "1" ]] && echo -e "${CYAN}[DEBUG]${NC} $1" || true; }
+
+print_banner() {
+  echo ""
+  echo "============================================================"
+  echo "  MongoDB PSA Replica Set Initializer"
+  echo "  (Primary + Secondary + Arbiter)"
+  echo "============================================================"
+  echo ""
 }
 
-print_on_start() {
-  echo "**********************************************************"
-  echo "*                                                        *"
-  echo "*  Deploying a Mongo PSA Replica Set to Railway...       *"
-  echo "*  (Primary + Secondary + Arbiter)                       *"
-  echo "*                                                        *"
-  echo "*  To enable verbose logging, set DEBUG=1                *"
-  echo "*  and redeploy the service.                             *"
-  echo "*                                                        *"
-  echo "**********************************************************"
-}
+# Default port
+MONGO_PORT=${MONGO_PORT:-27017}
 
 check_mongo() {
   local host=$1
   local port=$2
-  mongo_output=$(mongosh --host "$host" --port "$port" --eval "db.adminCommand('ping')" 2>&1)
-  mongo_exit_code=$?
-  debug_log "MongoDB check exit code: $mongo_exit_code"
-  debug_log "MongoDB check output: $mongo_output"
-  return $mongo_exit_code
+  local max_retries=${3:-60}
+  local retry_count=0
+  
+  log_info "Waiting for MongoDB at $host:$port..."
+  
+  while [ $retry_count -lt $max_retries ]; do
+    if mongosh --host "$host" --port "$port" --eval "db.adminCommand('ping')" &>/dev/null; then
+      log_info "✓ MongoDB at $host:$port is ready"
+      return 0
+    fi
+    
+    retry_count=$((retry_count + 1))
+    log_debug "Attempt $retry_count/$max_retries - Waiting..."
+    sleep 2
+  done
+  
+  log_error "✗ MongoDB at $host:$port is not available after $max_retries attempts"
+  return 1
 }
 
-check_all_nodes() {
-  local nodes=("$@")
-  for node in "${nodes[@]}"; do
-    local host=$(echo $node | cut -d: -f1)
-    local port=$(echo $node | cut -d: -f2)
-    echo "Waiting for MongoDB to be available at $host:$port"
-    until check_mongo "$host" "$port"; do
-      echo "Waiting..."
-      sleep 2
-    done
-  done
-  echo "All MongoDB nodes are up."
+wait_for_all_nodes() {
+  log_info "Waiting for all nodes to be ready..."
+  
+  check_mongo "$MONGO_PRIMARY_HOST" "$MONGO_PORT" 90 || return 1
+  check_mongo "$MONGO_SECONDARY_HOST" "$MONGO_PORT" 90 || return 1
+  check_mongo "$MONGO_ARBITER_HOST" "$MONGO_PORT" 90 || return 1
+  
+  log_info "All nodes are ready!"
+  return 0
+}
+
+check_already_initialized() {
+  log_info "Checking if replica set is already initialized..."
+  
+  local result
+  result=$(mongosh --host "$MONGO_PRIMARY_HOST" --port "$MONGO_PORT" \
+    --username "$MONGOUSERNAME" --password "$MONGOPASSWORD" \
+    --authenticationDatabase "admin" \
+    --eval "rs.status().ok" 2>/dev/null || echo "0")
+  
+  if [ "$result" = "1" ]; then
+    log_warn "Replica set is already initialized!"
+    return 0
+  fi
+  
+  return 1
 }
 
 initiate_psa_replica_set() {
-  echo "Initiating PSA (Primary-Secondary-Arbiter) replica set."
-  debug_log "_id: $REPLICA_SET_NAME"
-  debug_log "Primary member: $MONGO_PRIMARY_HOST:$MONGO_PORT"
-  debug_log "Secondary member: $MONGO_SECONDARY_HOST:$MONGO_PORT"
-  debug_log "Arbiter member: $MONGO_ARBITER_HOST:$MONGO_PORT"
-
-  mongosh --host "$MONGO_PRIMARY_HOST" --port "$MONGO_PORT" --username "$MONGOUSERNAME" --password "$MONGOPASSWORD" --authenticationDatabase "admin" <<EOF
+  log_info "Initiating PSA Replica Set..."
+  log_debug "Primary: $MONGO_PRIMARY_HOST:$MONGO_PORT"
+  log_debug "Secondary: $MONGO_SECONDARY_HOST:$MONGO_PORT"
+  log_debug "Arbiter: $MONGO_ARBITER_HOST:$MONGO_PORT"
+  
+  mongosh --host "$MONGO_PRIMARY_HOST" --port "$MONGO_PORT" \
+    --username "$MONGOUSERNAME" --password "$MONGOPASSWORD" \
+    --authenticationDatabase "admin" <<EOF
 rs.initiate({
   _id: "$REPLICA_SET_NAME",
   members: [
@@ -61,46 +99,84 @@ rs.initiate({
   ]
 })
 EOF
-  init_exit_code=$?
-  debug_log "PSA replica set initiation exit code: $init_exit_code"
-  return $init_exit_code
+  return $?
 }
 
-# Default port if not set
-MONGO_PORT=${MONGO_PORT:-27017}
+print_success() {
+  echo ""
+  echo "============================================================"
+  echo -e "${GREEN}  ✓ PSA Replica Set Initiated Successfully!${NC}"
+  echo "============================================================"
+  echo ""
+  echo "  Primary:   $MONGO_PRIMARY_HOST:$MONGO_PORT"
+  echo "  Secondary: $MONGO_SECONDARY_HOST:$MONGO_PORT"
+  echo "  Arbiter:   $MONGO_ARBITER_HOST:$MONGO_PORT"
+  echo ""
+  echo "  Connection String:"
+  echo "  mongodb://$MONGOUSERNAME:<password>@$MONGO_PRIMARY_HOST:$MONGO_PORT,$MONGO_SECONDARY_HOST:$MONGO_PORT/?replicaSet=$REPLICA_SET_NAME&authSource=admin"
+  echo ""
+  echo -e "${YELLOW}  ⚠️  PLEASE DELETE THIS SERVICE NOW!${NC}"
+  echo ""
+  echo "============================================================"
+}
 
-nodes=("$MONGO_PRIMARY_HOST:$MONGO_PORT" "$MONGO_SECONDARY_HOST:$MONGO_PORT" "$MONGO_ARBITER_HOST:$MONGO_PORT")
+print_failure() {
+  echo ""
+  echo "============================================================"
+  echo -e "${RED}  ✗ Failed to Initialize Replica Set${NC}"
+  echo "============================================================"
+  echo ""
+  echo "  Troubleshooting:"
+  echo "  1. Check if all nodes are running and healthy"
+  echo "  2. Verify KEYFILE is the same on all nodes"
+  echo "  3. Verify environment variables are correct"
+  echo "  4. Set DEBUG=1 for verbose logging"
+  echo "  5. Check MongoDB logs on each node"
+  echo ""
+  echo "============================================================"
+}
 
-print_on_start
+# ============================================================
+# Main Script
+# ============================================================
 
-check_all_nodes "${nodes[@]}"
+print_banner
 
+# Validate environment variables
+if [ -z "$MONGO_PRIMARY_HOST" ] || [ -z "$MONGO_SECONDARY_HOST" ] || [ -z "$MONGO_ARBITER_HOST" ]; then
+  log_error "Missing required environment variables!"
+  log_error "Required: MONGO_PRIMARY_HOST, MONGO_SECONDARY_HOST, MONGO_ARBITER_HOST"
+  exit 1
+fi
+
+if [ -z "$MONGOUSERNAME" ] || [ -z "$MONGOPASSWORD" ]; then
+  log_error "Missing credentials!"
+  log_error "Required: MONGOUSERNAME, MONGOPASSWORD"
+  exit 1
+fi
+
+REPLICA_SET_NAME=${REPLICA_SET_NAME:-rs0}
+log_info "Replica Set Name: $REPLICA_SET_NAME"
+
+# Wait for all nodes
+if ! wait_for_all_nodes; then
+  print_failure
+  exit 1
+fi
+
+# Check if already initialized
+if check_already_initialized; then
+  print_success
+  exit 0
+fi
+
+# Initialize replica set
 if initiate_psa_replica_set; then
-  echo "**********************************************************"
-  echo "**********************************************************"
-  echo "*                                                        *"
-  echo "*    PSA Replica set initiated successfully.             *"
-  echo "*                                                        *"
-  echo "*    - Primary:   $MONGO_PRIMARY_HOST:$MONGO_PORT        *"
-  echo "*    - Secondary: $MONGO_SECONDARY_HOST:$MONGO_PORT      *"
-  echo "*    - Arbiter:   $MONGO_ARBITER_HOST:$MONGO_PORT        *"
-  echo "*                                                        *"
-  echo "*              PLEASE DELETE THIS SERVICE.               *"
-  echo "*                                                        *"
-  echo "**********************************************************"
+  log_info "Waiting for election to complete..."
+  sleep 10
+  print_success
   exit 0
 else
-  echo "**********************************************************"
-  echo "**********************************************************"
-  echo "*                                                        *"
-  echo "*           Failed to initiate PSA replica set.          *"
-  echo "*                                                        *"
-  echo "*           Please check the MongoDB service logs        *"
-  echo "*                 for more information.                  *"
-  echo "*                                                        *"
-  echo "*          You can also set DEBUG=1 as a variable        *"
-  echo "*            on this service for verbose logging.        *"
-  echo "*                                                        *"
-  echo "**********************************************************"
+  print_failure
   exit 1
 fi

@@ -1,12 +1,29 @@
-# MongoDB Node Variables (Primary, Secondary, Arbiter)
-REPLICA_SET_NAME=rs0
-MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=<your-secure-password>
+# ============================================================
+# MongoDB Replica Set - Environment Variables
+# ============================================================
 
-# Init Service Variables (for initServicePSA)
+# ----- MongoDB Node Variables (Primary, Secondary, Arbiter) -----
+
+# Keyfile for replica set authentication (REQUIRED)
+# Generate using: openssl rand -base64 756
+# IMPORTANT: All nodes MUST use the same KEYFILE
+KEYFILE=<paste-your-generated-keyfile-here>
+
+# Replica set name (must be same across all nodes)
+REPLICA_SET_NAME=rs0
+
+# MongoDB root credentials
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=your-secure-password-here
+
+# ----- Init Service Variables -----
+
 MONGO_PRIMARY_HOST=mongo-primary.railway.internal
 MONGO_SECONDARY_HOST=mongo-secondary.railway.internal
 MONGO_ARBITER_HOST=mongo-arbiter.railway.internal
 MONGO_PORT=27017
 MONGOUSERNAME=admin
-MONGOPASSWORD=<your-secure-password>
+MONGOPASSWORD=your-secure-password-here
+
+# Optional: Enable debug logging for init service
+# DEBUG=1
