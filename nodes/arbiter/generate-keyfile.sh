@@ -37,8 +37,13 @@ if [ -z "$REPLICA_SET_NAME" ]; then
   exit 1
 fi
 
+# Force regenerate keyfile if requested
+if [ "$FORCE_KEYFILE_REGENERATE" = "1" ] || [ "$FORCE_KEYFILE_REGENERATE" = "true" ]; then
+  echo "FORCE_KEYFILE_REGENERATE is set. Regenerating keyfile..."
+  rm -f "$KEYFILE_PATH"
+  generate_keyfile
 # Check if keyfile exists and is valid
-if [ -f "$KEYFILE_PATH" ]; then
+elif [ -f "$KEYFILE_PATH" ]; then
   # Check if keyfile has correct permissions and is not empty
   KEYFILE_SIZE=$(stat -c%s "$KEYFILE_PATH" 2>/dev/null || stat -f%z "$KEYFILE_PATH" 2>/dev/null)
   
