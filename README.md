@@ -176,6 +176,28 @@ mongodb://admin:<password>@mongo-primary.railway.internal:27017,mongo-secondary.
 
 ---
 
+## 🌍 External Connection
+
+To connect from outside Railway (e.g., your local machine), you must expose the **Primary Node** publicly.
+
+### Steps:
+
+1. Go to `mongo-primary` service settings on Railway
+2. Under "Networking", click **"Generate Domain"** (or Custom Domain)
+3. You will get a TCP Proxy address, e.g., `roundhouse.proxy.rlwy.net:12345`
+
+### Connection String (Primary Only)
+
+Due to internal DNS resolution limits, external connections act as a **Direct Connection** to the primary node:
+
+```
+mongodb://admin:<password>@<tcp-proxy-host>:<tcp-proxy-port>/?directConnection=true&authSource=admin
+```
+
+> ⚠️ **Note**: This connects directly to the Primary node. It does not provide automatic failover for external clients, but is useful for administration/debugging.
+
+---
+
 ## 🔒 Security Best Practices
 
 - ✅ Use **strong, unique passwords** for production
