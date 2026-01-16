@@ -1,5 +1,5 @@
 # MongoDB Init Service for PSA Replica Set
-FROM mongo:8
+FROM mongo:8.2.3
 
 # Install required tools
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -1,5 +1,5 @@
 # MongoDB 8 Replica Set Node
-FROM mongo:8
+FROM mongo:8.2.3
 
 # Copy the setup script
 COPY generate-keyfile.sh /generate-keyfile.sh
